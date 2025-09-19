@@ -1,0 +1,30 @@
+[
+    {
+        "id": 1,
+        "name": "Luthfi Baehaqi",
+        "email": "admin@admin.com",
+        "password": "admin123",
+        "role": "admin"
+    },
+    {
+        "id": 2,
+        "name": "A Utay",
+        "email": "autay123@gmail.com",
+        "password": "autay123",
+        "role": "admin"
+    },
+    {
+        "id": 3,
+        "name": "agung",
+        "email": "agung123@gmail.com",
+        "password": "agung123",
+        "role": "user"
+    },
+    {
+        "id": 4,
+        "name": "Adam",
+        "email": "adam@gmail.com",
+        "password": "adam123",
+        "role": "user"
+    }
+]

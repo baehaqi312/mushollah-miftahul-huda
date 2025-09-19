@@ -1,0 +1,14 @@
+[
+    {
+        "id": 101,
+        "name": "Test 1",
+        "jumlah": "50",
+        "status": "Tersedia"
+    },
+    {
+        "id": 102,
+        "name": "Test 2",
+        "jumlah": "20",
+        "status": "Dipinjam"
+    }
+]
