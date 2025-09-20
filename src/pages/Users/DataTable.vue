@@ -9,7 +9,7 @@ import {
     useVueTable,
 } from "@tanstack/vue-table"
 import { ArrowUpDown, ChevronDown } from "lucide-vue-next"
-import { h, ref, watch, reactive } from "vue"
+import { h, ref, watch, reactive, onMounted, onUnmounted } from "vue"
 import { valueUpdater } from "@/lib/utils"
 
 import { Button } from "@/components/ui/button"
@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/table"
 
 // Import services dan components
-import { addUser, updateUser, deleteUser } from '@/services/userService'
+import { addUser, updateUser, deleteUser, getLoadingState, isLoadingOperation } from '@/services/userService'
 import FormModal from './FormModal.vue'
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog.vue'
 
@@ -39,9 +39,38 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    loading: {
+        type: Boolean,
+        default: false,
+    },
 })
 
 const emit = defineEmits(['refresh'])
+
+// Loading state reactive
+const loadingState = ref({
+    fetch: false,
+    add: false,
+    update: false,
+    delete: false
+})
+
+// Update loading state secara berkala
+const updateLoadingState = () => {
+    loadingState.value = getLoadingState()
+}
+
+// Setup interval untuk update loading state
+let loadingInterval
+onMounted(() => {
+    loadingInterval = setInterval(updateLoadingState, 100)
+})
+
+onUnmounted(() => {
+    if (loadingInterval) {
+        clearInterval(loadingInterval)
+    }
+})
 
 const data = ref(props.users)
 
@@ -85,13 +114,15 @@ const columns = [
                 h(Button, {
                     size: "sm",
                     variant: "outline",
+                    disabled: loadingState.value.update,
                     onClick: () => openEditModal(user)
-                }, () => "Edit"),
+                }, () => loadingState.value.update ? "Loading..." : "Edit"),
                 h(Button, {
                     size: "sm",
                     variant: "destructive",
+                    disabled: loadingState.value.delete,
                     onClick: () => confirmDelete(user)
-                }, () => "Hapus")
+                }, () => loadingState.value.delete ? "Loading..." : "Hapus")
             ])
         },
     },
@@ -134,11 +165,11 @@ watch(emailFilter, (val) => {
 const showFormModal = ref(false)
 const isEditMode = ref(false)
 const formData = reactive({
-  id: null,
-  name: '',
-  email: '',
-  password: '',
-  role: 'user',
+    id: null,
+    name: '',
+    email: '',
+    password: '',
+    role: 'user',
 })
 
 // State untuk confirmation dialogs
@@ -148,48 +179,56 @@ const deleteMessage = ref('')
 
 // Fungsi untuk membuka modal (mode tambah)
 const openCreateModal = () => {
-  isEditMode.value = false
-  // Reset form data
-  Object.assign(formData, { id: null, name: '', email: '', password: '', role: 'user' })
-  showFormModal.value = true
+    isEditMode.value = false
+    // Reset form data
+    Object.assign(formData, { id: null, name: '', email: '', password: '', role: 'user' })
+    showFormModal.value = true
 }
 
 // Fungsi untuk membuka modal (mode edit)
 const openEditModal = (user) => {
-  isEditMode.value = true
-  // Isi form data dengan data user yang dipilih
-  Object.assign(formData, user)
-  showFormModal.value = true
+    isEditMode.value = true
+    // Isi form data dengan data user yang dipilih
+    Object.assign(formData, user)
+    showFormModal.value = true
 }
 
 // Fungsi yang menangani event @submit dari modal
-const handleFormSubmit = (data) => {
-  console.log('UserDataTable - Data diterima dari FormModal:', data);
-  console.log('UserDataTable - Mode:', isEditMode.value ? 'Edit' : 'Add');
-  
-  if (isEditMode.value) {
-    updateUser(data)
-  } else {
-    addUser(data)
-  }
-  // Beri tahu parent (Index.vue) untuk memuat ulang data
-  emit('refresh')
+const handleFormSubmit = async (data) => {
+    console.log('UserDataTable - Data diterima dari FormModal:', data);
+    console.log('UserDataTable - Mode:', isEditMode.value ? 'Edit' : 'Add');
+
+    try {
+        if (isEditMode.value) {
+            await updateUser(data)
+        } else {
+            await addUser(data)
+        }
+        // Beri tahu parent (Index.vue) untuk memuat ulang data
+        emit('refresh')
+    } catch (error) {
+        console.error('Error saving user:', error);
+    }
 }
 
 // Fungsi untuk menampilkan dialog konfirmasi delete
 const confirmDelete = (user) => {
-  selectedItem.value = user
-  deleteMessage.value = `Apakah Anda yakin ingin menghapus pengguna "${user.name}" (${user.email})?`
-  showDeleteDialog.value = true
+    selectedItem.value = user
+    deleteMessage.value = `Apakah Anda yakin ingin menghapus pengguna "${user.name}" (${user.email})?`
+    showDeleteDialog.value = true
 }
 
 // Fungsi yang dipanggil saat konfirmasi delete
-const handleDeleteConfirm = () => {
-  if (selectedItem.value) {
-    deleteUser(selectedItem.value.id)
-    emit('refresh')
-    selectedItem.value = null
-  }
+const handleDeleteConfirm = async () => {
+    if (selectedItem.value) {
+        try {
+            await deleteUser(selectedItem.value.id)
+            emit('refresh')
+            selectedItem.value = null
+        } catch (error) {
+            console.error('Error deleting user:', error);
+        }
+    }
 }
 </script>
 
@@ -267,18 +306,10 @@ const handleDeleteConfirm = () => {
         </div>
 
         <!-- Form Modal for Add/Edit -->
-        <FormModal 
-            v-model:open="showFormModal" 
-            :is-edit-mode="isEditMode" 
-            :initial-data="formData" 
-            @submit="handleFormSubmit"
-        />
+        <FormModal v-model:open="showFormModal" :is-edit-mode="isEditMode" :initial-data="formData"
+            @submit="handleFormSubmit" />
 
         <!-- Delete Confirmation Dialog -->
-        <DeleteConfirmDialog
-            v-model:open="showDeleteDialog"
-            :message="deleteMessage"
-            @confirm="handleDeleteConfirm"
-        />
+        <DeleteConfirmDialog v-model:open="showDeleteDialog" :message="deleteMessage" @confirm="handleDeleteConfirm" />
     </div>
 </template>

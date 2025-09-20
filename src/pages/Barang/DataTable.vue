@@ -9,7 +9,7 @@ import {
     useVueTable,
 } from "@tanstack/vue-table"
 import { ArrowUpDown, ChevronDown } from "lucide-vue-next"
-import { h, ref, watch, reactive } from "vue"
+import { h, ref, watch, reactive, onMounted, onUnmounted } from "vue"
 import { valueUpdater } from "@/lib/utils"
 
 import { Button } from "@/components/ui/button"
@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/table"
 
 // Import services dan components
-import { addItem, updateItem, deleteItem, returnItem } from '@/services/barangService'
+import { addItem, updateItem, deleteItem, returnItem, getLoadingState, isLoadingOperation } from '@/services/barangService'
 import FormModal from './FormModal.vue'
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog.vue'
 import ReturnConfirmDialog from '@/components/ui/ReturnConfirmDialog.vue'
@@ -40,9 +40,41 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    loading: {
+        type: Boolean,
+        default: false,
+    },
 })
 
 const emit = defineEmits(['refresh'])
+
+// Loading state reactive
+const loadingState = ref({
+    fetch: false,
+    add: false,
+    update: false,
+    delete: false,
+    return: false,
+    export: false,
+    import: false
+})
+
+// Update loading state secara berkala
+const updateLoadingState = () => {
+    loadingState.value = getLoadingState()
+}
+
+// Setup interval untuk update loading state
+let loadingInterval
+onMounted(() => {
+    loadingInterval = setInterval(updateLoadingState, 100)
+})
+
+onUnmounted(() => {
+    if (loadingInterval) {
+        clearInterval(loadingInterval)
+    }
+})
 
 const data = ref(props.items);
 
@@ -88,30 +120,32 @@ const columns = [
         },
     },
     {
-      id: "actions",
-      enableHiding: false,
-      header: () => h("div", { class: "text-center" }, "Actions"),
-      cell: ({ row }) => {
-        const item = row.original
-        return h("div", { class: "flex gap-2 justify-center" }, [
-          h(Button, {
-            variant: "secondary",
-            size: "sm",
-            disabled: row.getValue("status") !== "Dipinjam",
-            onClick: () => confirmReturn(item)
-          }, () => "Return"),
-          h(Button, {
-            variant: "outline",
-            size: "sm",
-            onClick: () => openEditModal(item)
-          }, () => "Edit"),
-          h(Button, {
-            variant: "destructive",
-            size: "sm",
-            onClick: () => confirmDelete(item)
-          }, () => "Hapus"),
-        ].filter(Boolean)) // Remove null values
-      },
+        id: "actions",
+        enableHiding: false,
+        header: () => h("div", { class: "text-center" }, "Actions"),
+        cell: ({ row }) => {
+            const item = row.original
+            return h("div", { class: "flex gap-2 justify-center" }, [
+                h(Button, {
+                    variant: "secondary",
+                    size: "sm",
+                    disabled: row.getValue("status") !== "Dipinjam" || loadingState.value.return,
+                    onClick: () => confirmReturn(item)
+                }, () => loadingState.value.return ? "Loading..." : "Return"),
+                h(Button, {
+                    variant: "outline",
+                    size: "sm",
+                    disabled: loadingState.value.update,
+                    onClick: () => openEditModal(item)
+                }, () => loadingState.value.update ? "Loading..." : "Edit"),
+                h(Button, {
+                    variant: "destructive",
+                    size: "sm",
+                    disabled: loadingState.value.delete,
+                    onClick: () => confirmDelete(item)
+                }, () => loadingState.value.delete ? "Loading..." : "Hapus"),
+            ].filter(Boolean)) // Remove null values
+        },
     },
 ]
 
@@ -152,10 +186,10 @@ watch(namaFilter, (val) => {
 const showFormModal = ref(false)
 const isEditMode = ref(false)
 const formData = reactive({
-  id: null,
-  name: '',
-  jumlah: '',
-  status: 'Dipinjam',
+    id: null,
+    name: '',
+    jumlah: '',
+    status: 'Dipinjam',
 })
 
 // State untuk confirmation dialogs
@@ -167,64 +201,76 @@ const returnMessage = ref('')
 
 // Fungsi untuk membuka modal (mode tambah)
 const openCreateModal = () => {
-  isEditMode.value = false
-  // Reset form data
-  Object.assign(formData, { id: null, name: '', jumlah: '', status: 'Dipinjam' })
-  showFormModal.value = true
+    isEditMode.value = false
+    // Reset form data
+    Object.assign(formData, { id: null, name: '', jumlah: '', status: 'Dipinjam' })
+    showFormModal.value = true
 }
 
 // Fungsi untuk membuka modal (mode edit)
 const openEditModal = (item) => {
-  isEditMode.value = true
-  // Isi form data dengan data item yang dipilih
-  Object.assign(formData, item)
-  showFormModal.value = true
+    isEditMode.value = true
+    // Isi form data dengan data item yang dipilih
+    Object.assign(formData, item)
+    showFormModal.value = true
 }
 
 // Fungsi yang menangani event @submit dari modal
-const handleFormSubmit = (data) => {
-  console.log('DataTable - Data diterima dari FormModal:', data);
-  console.log('DataTable - Mode:', isEditMode.value ? 'Edit' : 'Add');
-  
-  if (isEditMode.value) {
-    updateItem(data)
-  } else {
-    addItem(data)
-  }
-  // Beri tahu parent (Index.vue) untuk memuat ulang data
-  emit('refresh')
+const handleFormSubmit = async (data) => {
+    console.log('DataTable - Data diterima dari FormModal:', data);
+    console.log('DataTable - Mode:', isEditMode.value ? 'Edit' : 'Add');
+
+    try {
+        if (isEditMode.value) {
+            await updateItem(data)
+        } else {
+            await addItem(data)
+        }
+        // Beri tahu parent (Index.vue) untuk memuat ulang data
+        emit('refresh')
+    } catch (error) {
+        console.error('Error saving item:', error);
+    }
 }
 
 // Fungsi untuk menampilkan dialog konfirmasi delete
 const confirmDelete = (item) => {
-  selectedItem.value = item
-  deleteMessage.value = `Apakah Anda yakin ingin menghapus peminjaman dari "${item.name}"?`
-  showDeleteDialog.value = true
+    selectedItem.value = item
+    deleteMessage.value = `Apakah Anda yakin ingin menghapus peminjaman dari "${item.name}"?`
+    showDeleteDialog.value = true
 }
 
 // Fungsi untuk menampilkan dialog konfirmasi return
 const confirmReturn = (item) => {
-  selectedItem.value = item
-  returnMessage.value = `Konfirmasi pengembalian dari "${item.name}"?`
-  showReturnDialog.value = true
+    selectedItem.value = item
+    returnMessage.value = `Konfirmasi pengembalian dari "${item.name}"?`
+    showReturnDialog.value = true
 }
 
 // Fungsi yang dipanggil saat konfirmasi delete
-const handleDeleteConfirm = () => {
-  if (selectedItem.value) {
-    deleteItem(selectedItem.value.id)
-    emit('refresh')
-    selectedItem.value = null
-  }
+const handleDeleteConfirm = async () => {
+    if (selectedItem.value) {
+        try {
+            await deleteItem(selectedItem.value.id)
+            emit('refresh')
+            selectedItem.value = null
+        } catch (error) {
+            console.error('Error deleting item:', error);
+        }
+    }
 }
 
 // Fungsi yang dipanggil saat konfirmasi return
-const handleReturnConfirm = () => {
-  if (selectedItem.value) {
-    returnItem(selectedItem.value.id)
-    emit('refresh')
-    selectedItem.value = null
-  }
+const handleReturnConfirm = async () => {
+    if (selectedItem.value) {
+        try {
+            await returnItem(selectedItem.value.id)
+            emit('refresh')
+            selectedItem.value = null
+        } catch (error) {
+            console.error('Error returning item:', error);
+        }
+    }
 }
 </script>
 
@@ -249,10 +295,21 @@ const handleReturnConfirm = () => {
                         </DropdownMenuCheckboxItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
-                <Button class="ms-2" @click="openCreateModal">Tambah Peminjaman</Button>
+                <Button class="ms-2" :disabled="loadingState.add" @click="openCreateModal">
+                    {{ loadingState.add ? 'Loading...' : 'Tambah Peminjaman' }}
+                </Button>
             </div>
         </div>
-        <div class="rounded-md border">
+        <div class="rounded-md border relative">
+            <!-- Loading overlay -->
+            <div v-if="loading || loadingState.fetch"
+                class="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex items-center justify-center">
+                <div class="flex items-center gap-2">
+                    <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                    <span>Loading data...</span>
+                </div>
+            </div>
+
             <Table>
                 <TableHeader>
                     <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
@@ -277,7 +334,7 @@ const handleReturnConfirm = () => {
                             </TableRow>
                         </template>
                     </template>
-                    <TableRow v-else>
+                    <TableRow v-else-if="!loading && !loadingState.fetch">
                         <TableCell :colspan="columns.length" class="h-24 text-center">
                             No results.
                         </TableCell>
@@ -302,25 +359,13 @@ const handleReturnConfirm = () => {
         </div>
 
         <!-- Form Modal for Add/Edit -->
-        <FormModal 
-            v-model:open="showFormModal" 
-            :is-edit-mode="isEditMode" 
-            :initial-data="formData" 
-            @submit="handleFormSubmit"
-        />
+        <FormModal v-model:open="showFormModal" :is-edit-mode="isEditMode" :initial-data="formData"
+            @submit="handleFormSubmit" />
 
         <!-- Delete Confirmation Dialog -->
-        <DeleteConfirmDialog
-            v-model:open="showDeleteDialog"
-            :message="deleteMessage"
-            @confirm="handleDeleteConfirm"
-        />
+        <DeleteConfirmDialog v-model:open="showDeleteDialog" :message="deleteMessage" @confirm="handleDeleteConfirm" />
 
         <!-- Return Confirmation Dialog -->
-        <ReturnConfirmDialog
-            v-model:open="showReturnDialog"
-            :message="returnMessage"
-            @confirm="handleReturnConfirm"
-        />
+        <ReturnConfirmDialog v-model:open="showReturnDialog" :message="returnMessage" @confirm="handleReturnConfirm" />
     </div>
 </template>

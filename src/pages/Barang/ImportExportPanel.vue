@@ -3,27 +3,24 @@
     <div class="flex items-center justify-between">
       <h3 class="text-lg font-semibold">Import & Export Data</h3>
       <div class="flex gap-2">
-        <Button 
-          @click="handleExport"
-          variant="outline"
-          size="sm"
-          :disabled="isProcessing"
-        >
-          <Download class="w-4 h-4 mr-2" />
-          Export Excel
+        <Button @click="handleExport" variant="outline" size="sm" :disabled="isProcessing || loadingState.export">
+          <div v-if="loadingState.export" class="flex items-center gap-2">
+            <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-current"></div>
+            <span>Exporting...</span>
+          </div>
+          <div v-else class="flex items-center gap-2">
+            <Download class="w-4 h-4" />
+            <span>Export Excel</span>
+          </div>
         </Button>
-        
-        <Button 
-          @click="handleDownloadTemplate"
-          variant="outline"
-          size="sm"
-        >
+
+        <Button @click="handleDownloadTemplate" variant="outline" size="sm">
           <FileDown class="w-4 h-4 mr-2" />
           Download Template
         </Button>
       </div>
     </div>
-    
+
     <!-- Import Section -->
     <div class="grid gap-4">
       <div class="flex items-center gap-4">
@@ -32,46 +29,42 @@
             Import dari Excel
           </Label>
           <div class="mt-1">
-            <input
-              id="file-input"
-              ref="fileInput"
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              @change="handleFileSelect"
-              class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
-            />
+            <input id="file-input" ref="fileInput" type="file" accept=".xlsx,.xls,.csv" @change="handleFileSelect"
+              class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90" />
           </div>
         </div>
-        
-        <Button 
-          @click="handleImport"
-          :disabled="!selectedFile || isProcessing"
-          size="sm"
-          class="mt-6"
-        >
-          <Upload class="w-4 h-4 mr-2" />
-          <span v-if="isProcessing">Processing...</span>
-          <span v-else>Import</span>
+
+        <Button @click="handleImport" :disabled="!selectedFile || isProcessing || loadingState.import" size="sm"
+          class="mt-6">
+          <div v-if="isProcessing || loadingState.import" class="flex items-center gap-2">
+            <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-current"></div>
+            <span>Processing...</span>
+          </div>
+          <div v-else class="flex items-center gap-2">
+            <Upload class="w-4 h-4" />
+            <span>Import</span>
+          </div>
         </Button>
       </div>
-      
+
       <!-- Progress indicator -->
-      <div v-if="isProcessing" class="flex items-center gap-2 text-sm text-muted-foreground">
+      <div v-if="isProcessing || loadingState.import || loadingState.export"
+        class="flex items-center gap-2 text-sm text-muted-foreground">
         <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-        Memproses file...
+        <span v-if="loadingState.import">Mengimpor data...</span>
+        <span v-else-if="loadingState.export">Mengekspor data...</span>
+        <span v-else>Memproses file...</span>
       </div>
     </div>
-    
+
     <!-- Status Messages -->
     <div v-if="statusMessage" class="space-y-2">
-      <div 
-        :class="[
-          'p-3 rounded-md text-sm',
-          statusMessage.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' :
+      <div :class="[
+        'p-3 rounded-md text-sm',
+        statusMessage.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' :
           statusMessage.type === 'error' ? 'bg-red-50 text-red-800 border border-red-200' :
-          'bg-blue-50 text-blue-800 border border-blue-200'
-        ]"
-      >
+            'bg-blue-50 text-blue-800 border border-blue-200'
+      ]">
         <div class="flex items-start gap-2">
           <CheckCircle v-if="statusMessage.type === 'success'" class="w-4 h-4 mt-0.5 flex-shrink-0" />
           <XCircle v-else-if="statusMessage.type === 'error'" class="w-4 h-4 mt-0.5 flex-shrink-0" />
@@ -91,7 +84,7 @@
         </div>
       </div>
     </div>
-    
+
     <!-- Import Results -->
     <div v-if="importResults && importResults.success && importResults.items" class="space-y-2">
       <h4 class="text-sm font-medium text-green-800">Data yang berhasil diimpor:</h4>
@@ -108,21 +101,23 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { 
-  Download, 
-  Upload, 
-  FileDown, 
-  CheckCircle, 
-  XCircle, 
-  Info 
+import {
+  Download,
+  Upload,
+  FileDown,
+  CheckCircle,
+  XCircle,
+  Info
 } from 'lucide-vue-next';
-import { 
-  exportToExcel, 
-  importFromExcel, 
-  downloadTemplate 
+import {
+  exportToExcel,
+  importFromExcel,
+  downloadTemplate,
+  getLoadingState,
+  isLoadingOperation
 } from '@/services/barangService';
 
 const emit = defineEmits(['refresh']);
@@ -133,17 +128,42 @@ const isProcessing = ref(false);
 const statusMessage = ref(null);
 const importResults = ref(null);
 
+// Loading state dari service
+const loadingState = ref({
+  export: false,
+  import: false
+});
+
+// Update loading state
+const updateLoadingState = () => {
+  const currentLoading = getLoadingState();
+  loadingState.value.export = currentLoading.export;
+  loadingState.value.import = currentLoading.import;
+};
+
+// Setup interval untuk update loading state
+let loadingInterval;
+onMounted(() => {
+  loadingInterval = setInterval(updateLoadingState, 100);
+});
+
+onUnmounted(() => {
+  if (loadingInterval) {
+    clearInterval(loadingInterval);
+  }
+});
+
 const handleFileSelect = (event) => {
   const file = event.target.files[0];
   selectedFile.value = file;
   statusMessage.value = null;
   importResults.value = null;
-  
+
   if (file) {
-    const validTypes = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 
-                       'application/vnd.ms-excel', 
-                       'text/csv'];
-    
+    const validTypes = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+      'text/csv'];
+
     if (!validTypes.includes(file.type)) {
       statusMessage.value = {
         type: 'error',
@@ -155,9 +175,9 @@ const handleFileSelect = (event) => {
   }
 };
 
-const handleExport = () => {
+const handleExport = async () => {
   try {
-    const result = exportToExcel();
+    const result = await exportToExcel();
     statusMessage.value = {
       type: 'success',
       message: result.message
@@ -187,30 +207,30 @@ const handleDownloadTemplate = () => {
 
 const handleImport = async () => {
   if (!selectedFile.value) return;
-  
+
   isProcessing.value = true;
   statusMessage.value = null;
   importResults.value = null;
-  
+
   try {
     const result = await importFromExcel(selectedFile.value);
-    
+
     if (result.success) {
       statusMessage.value = {
         type: 'success',
         message: result.message
       };
       importResults.value = result;
-      
+
       // Reset file input
       selectedFile.value = null;
       if (fileInput.value) {
         fileInput.value.value = '';
       }
-      
+
       // Refresh data di parent component
       emit('refresh');
-      
+
       // Clear message after 5 seconds
       setTimeout(() => {
         statusMessage.value = null;

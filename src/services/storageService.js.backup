@@ -1,0 +1,440 @@
+import googleSheetsService from './googleSheetsService.js';
+import { GOOGLE_SHEETS_CONFIG, USE_FALLBACK_STORAGE, validateGoogleSheetsConfig } from './googleSheetsConfERS_KEY = 'miftahul_huda_users';
+const ITEMS_KEY = 'miftahul_huda_items';
+const LOGGED_IN_USER_KEY = 'miftahul_huda_loggedInUser';
+
+// Status inisialisasi Google Sheets
+let googleSheetsInitialized = false;
+
+// Inisialisasi Google Sheets
+const initGoogleSheets = async () => {
+    try {
+        const validation = validateGoogleSheetsConfig();
+
+        if (!validation.isValid) {
+            console.error('Google Sheets not configured properly:', validation.message);
+            throw new Error('Google Sheets configuration missing');
+        }
+
+        const config = GOOGLE_SHEETS_CONFIG;
+
+        // Prioritas API Key untuk browser environment
+        if (config.API_KEY && config.API_KEY !== 'YOUR_GOOGLE_API_KEY_HERE') {
+            await googleSheetsService.initWithApiKey(
+                config.API_KEY,
+                config.SPREADSHEET_ID
+            );
+            googleSheetsInitialized = true;
+            console.log('Google Sheets initialized successfully (Full CRUD mode)');
+        } else if (config.SERVICE_ACCOUNT) {
+            // Service Account untuk server environment
+            await googleSheetsService.initWithServiceAccount(
+                config.SERVICE_ACCOUNT,
+                config.SPREADSHEET_ID
+            );
+            googleSheetsInitialized = true;
+            console.log('Google Sheets initialized with Service Account');
+        } else {
+            throw new Error('No valid authentication method found');
+        }
+        return true;
+    } catch (error) {
+        console.error('Failed to initialize Google Sheets:', error);
+        throw error;
+    }
+};
+
+// Inisialisasi data awal (seperti seeder di Laravel)
+export const initStorage = async () => {
+    try {
+        // Inisialisasi Google Sheets (wajib berhasil)
+        await initGoogleSheets();
+
+        // Jika Google Sheets tersedia, inisialisasi data awal
+        if (googleSheetsInitialized) {
+            await initGoogleSheetsData();
+        }
+        
+        console.log('Storage initialized successfully with Google Sheets');
+    } catch (error) {
+        console.error('Critical error: Cannot initialize storage:', error);
+        throw error;
+    }
+};
+
+// Inisialisasi data awal di Google Sheets
+const initGoogleSheetsData = async () => {
+    try {
+        // Cek apakah data sudah ada
+        const existingUsers = await googleSheetsService.getSheetAsJson(GOOGLE_SHEETS_CONFIG.SHEETS.USERS);
+        const existingItems = await googleSheetsService.getSheetAsJson(GOOGLE_SHEETS_CONFIG.SHEETS.ITEMS);
+
+        // Jika belum ada data users, tambahkan data awal
+        if (existingUsers.length === 0) {
+            const initialUsers = [
+                {
+                    id: 1,
+                    name: 'Admin',
+                    email: 'luthfi@gmail.com',
+                    password: '123456',
+                    role: 'admin',
+                    is_active: true,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                },
+                {
+                    id: 2,
+                    name: 'User Biasa',
+                    email: 'agung123@gmail.com',
+                    password: '123456',
+                    role: 'user',
+                    is_active: true,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                },
+                {
+                    id: 3,
+                    name: 'John Doe',
+                    email: 'autay123@gmail.com',
+                    password: '123456',
+                    role: 'admin',
+                    is_active: true,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                },
+                {
+                    id: 4,
+                    name: 'Jane Smith',
+                    email: 'adam123@gmail.com',
+                    password: '123456',
+                    role: 'user',
+                    is_active: false,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                }
+            ];
+            console.log('Initializing users data in Google Sheets...');
+            await googleSheetsService.saveJsonToSheet(GOOGLE_SHEETS_CONFIG.SHEETS.USERS, initialUsers);
+        }
+
+        // Jika belum ada data items, tambahkan data awal
+        if (existingItems.length === 0) {
+            const initialItems = [
+                {
+                    id: 101,
+                    name: 'Kursi Plastik',
+                    jumlah: 50,
+                    status: 'Tersedia',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                },
+                {
+                    id: 102,
+                    name: 'Meja Lipat',
+                    jumlah: 20,
+                    status: 'Dipinjam',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                },
+                {
+                    id: 103,
+                    name: 'Mikrophone Wireless',
+                    jumlah: 5,
+                    status: 'Tersedia',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                },
+                {
+                    id: 104,
+                    name: 'Karpet Masjid',
+                    jumlah: 100,
+                    status: 'Tersedia',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                }
+            ];
+            console.log('Initializing items data in Google Sheets...');
+            await googleSheetsService.saveJsonToSheet(GOOGLE_SHEETS_CONFIG.SHEETS.ITEMS, initialItems);
+        }
+
+        console.log('Google Sheets data initialization completed');
+    } catch (error) {
+        console.error('Error initializing Google Sheets data:', error);
+        throw error;
+    }
+};
+        localStorage.setItem(USERS_KEY, JSON.stringify([
+            {
+                id: 1,
+                name: 'Admin',
+                email: 'luthfi@gmail.com',
+                password: '123456',
+                role: 'admin',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            },
+            {
+                id: 2,
+                name: 'User Biasa',
+                email: 'agung123@gmail.com',
+                password: '123456',
+                role: 'user',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            },
+            {
+                id: 3,
+                name: 'John Doe',
+                email: 'autay123@gmail.com',
+                password: '123456',
+                role: 'admin',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            },
+            {
+                id: 4,
+                name: 'Jane Smith',
+                email: 'adam123@gmail.com',
+                password: '123456',
+                role: 'user',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            }
+        ]));
+    }
+    if (!localStorage.getItem(ITEMS_KEY)) {
+        localStorage.setItem(ITEMS_KEY, JSON.stringify([
+            {
+                id: 101,
+                name: 'Kursi Plastik',
+                jumlah: '50',
+                status: 'Tersedia',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            },
+            {
+                id: 102,
+                name: 'Meja Lipat',
+                jumlah: '20',
+                status: 'Dipinjam',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            },
+        ]));
+    }
+
+    // Jika Google Sheets tersedia, inisialisasi data awal di Google Sheets juga
+    if (googleSheetsInitialized) {
+        await initGoogleSheetsData();
+    }
+};
+
+// Inisialisasi data awal di Google Sheets
+const initGoogleSheetsData = async () => {
+    try {
+        // Cek apakah data sudah ada
+        const existingUsers = await googleSheetsService.getSheetAsJson(GOOGLE_SHEETS_CONFIG.SHEETS.USERS);
+        const existingItems = await googleSheetsService.getSheetAsJson(GOOGLE_SHEETS_CONFIG.SHEETS.ITEMS);
+
+        // Jika belum ada data users, tambahkan data awal
+        if (existingUsers.length === 0) {
+            const initialUsers = [
+                {
+                    id: 1,
+                    name: 'Admin',
+                    email: 'luthfi@gmail.com',
+                    password: '123456',
+                    role: 'admin',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                },
+                {
+                    id: 2,
+                    name: 'User Biasa',
+                    email: 'agung123@gmail.com',
+                    password: '123456',
+                    role: 'user',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                },
+                {
+                    id: 3,
+                    name: 'John Doe',
+                    email: 'autay123@gmail.com',
+                    password: '123456',
+                    role: 'admin',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                },
+                {
+                    id: 4,
+                    name: 'Jane Smith',
+                    email: 'adam123@gmail.com',
+                    password: '123456',
+                    role: 'user',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                }
+            ];
+            await googleSheetsService.saveJsonToSheet(GOOGLE_SHEETS_CONFIG.SHEETS.USERS, initialUsers);
+        }
+
+        // Jika belum ada data items, tambahkan data awal
+        if (existingItems.length === 0) {
+            const initialItems = [
+                {
+                    id: 101,
+                    name: 'Kursi Plastik',
+                    jumlah: '50',
+                    status: 'Tersedia',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                },
+                {
+                    id: 102,
+                    name: 'Meja Lipat',
+                    jumlah: '20',
+                    status: 'Dipinjam',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                },
+            ];
+            await googleSheetsService.saveJsonToSheet(GOOGLE_SHEETS_CONFIG.SHEETS.ITEMS, initialItems);
+        }
+
+        console.log('Google Sheets data initialization completed');
+    } catch (error) {
+        console.error('Error initializing Google Sheets data:', error);
+    }
+};
+
+// --- User Management ---
+export const getUsers = async () => {
+    // Dalam hybrid mode, selalu baca dari localStorage karena data terbaru ada di situ
+    // Google Sheets hanya digunakan untuk initial load jika localStorage kosong
+    const localData = JSON.parse(localStorage.getItem(USERS_KEY));
+
+    if (localData && localData.length > 0) {
+        // Ada data di localStorage, gunakan itu
+        return localData;
+    } else if (googleSheetsInitialized) {
+        // LocalStorage kosong, coba ambil dari Google Sheets sebagai initial data
+        try {
+            console.log('Loading initial users data from Google Sheets...');
+            const data = await googleSheetsService.getSheetAsJson(GOOGLE_SHEETS_CONFIG.SHEETS.USERS);
+            const processedData = data.map(user => ({
+                ...user,
+                id: parseInt(user.id) || user.id
+            }));
+
+            // Simpan ke localStorage untuk penggunaan selanjutnya
+            if (processedData.length > 0) {
+                localStorage.setItem(USERS_KEY, JSON.stringify(processedData));
+            }
+
+            return processedData;
+        } catch (error) {
+            console.error('Error fetching users from Google Sheets:', error);
+            return [];
+        }
+    } else {
+        // Tidak ada Google Sheets, return empty array
+        return [];
+    }
+};
+
+export const saveUsers = async (users) => {
+    // Selalu simpan ke localStorage untuk write operations
+    const usersWithTimestamp = users.map(user => ({
+        ...user,
+        updated_at: new Date().toISOString()
+    }));
+
+    localStorage.setItem(USERS_KEY, JSON.stringify(usersWithTimestamp));
+
+    // Log info tentang Google Sheets read capability
+    if (googleSheetsInitialized) {
+        console.log('Data saved to localStorage. Google Sheets is available for reading existing data.');
+    }
+};
+
+// --- Item Management ---
+export const getItems = async () => {
+    // Dalam hybrid mode, selalu baca dari localStorage karena data terbaru ada di situ
+    // Google Sheets hanya digunakan untuk initial load jika localStorage kosong
+    const localData = JSON.parse(localStorage.getItem(ITEMS_KEY));
+
+    if (localData && localData.length > 0) {
+        // Ada data di localStorage, gunakan itu
+        return localData;
+    } else if (googleSheetsInitialized) {
+        // LocalStorage kosong, coba ambil dari Google Sheets sebagai initial data
+        try {
+            console.log('Loading initial items data from Google Sheets...');
+            const data = await googleSheetsService.getSheetAsJson(GOOGLE_SHEETS_CONFIG.SHEETS.ITEMS);
+            const processedData = data.map(item => ({
+                ...item,
+                id: parseInt(item.id) || item.id
+            }));
+
+            // Simpan ke localStorage untuk penggunaan selanjutnya
+            if (processedData.length > 0) {
+                localStorage.setItem(ITEMS_KEY, JSON.stringify(processedData));
+            }
+
+            return processedData;
+        } catch (error) {
+            console.error('Error fetching items from Google Sheets:', error);
+            return [];
+        }
+    } else {
+        // Tidak ada Google Sheets, return empty array
+        return [];
+    }
+};
+
+export const saveItems = async (items) => {
+    // Selalu simpan ke localStorage untuk write operations
+    const itemsWithTimestamp = items.map(item => ({
+        ...item,
+        updated_at: new Date().toISOString()
+    }));
+
+    localStorage.setItem(ITEMS_KEY, JSON.stringify(itemsWithTimestamp));
+
+    // Log info tentang Google Sheets read capability
+    if (googleSheetsInitialized) {
+        console.log('Data saved to localStorage. Google Sheets is available for reading existing data.');
+    }
+};
+
+// --- Auth Management ---
+// Session tetap menggunakan localStorage karena sifatnya temporary
+export const getLoggedInUser = () => JSON.parse(localStorage.getItem(LOGGED_IN_USER_KEY));
+export const setLoggedInUser = (user) => localStorage.setItem(LOGGED_IN_USER_KEY, JSON.stringify(user));
+export const clearLoggedInUser = () => localStorage.removeItem(LOGGED_IN_USER_KEY);
+
+// --- Utility Functions ---
+export const getStorageStatus = () => ({
+    useLocalStorage: true, // Always true for write operations in browser
+    googleSheetsInitialized,
+    isConnected: googleSheetsService.isConnected(),
+    mode: googleSheetsInitialized ? 'hybrid' : 'localStorage-only',
+    description: googleSheetsInitialized
+        ? 'Read from Google Sheets, Write to localStorage'
+        : 'Using localStorage only'
+});
+
+export const switchToLocalStorage = () => {
+    useLocalStorage = true;
+    console.log('Switched to localStorage mode');
+};
+
+export const retryGoogleSheets = async () => {
+    const success = await initGoogleSheets();
+    if (success) {
+        useLocalStorage = false;
+        console.log('Successfully reconnected to Google Sheets');
+    }
+    return success;
+};
