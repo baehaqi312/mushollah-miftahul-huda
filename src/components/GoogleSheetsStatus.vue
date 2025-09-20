@@ -100,8 +100,17 @@ const storageStatus = ref({
 
 const isRetrying = ref(false);
 
-const refreshStatus = () => {
-    storageStatus.value = getStorageStatus();
+const refreshStatus = async () => {
+    try {
+        // Try to ensure Google Sheets is initialized first
+        const { ensureGoogleSheetsInitialized } = await import('@/services/storageService.js');
+        await ensureGoogleSheetsInitialized();
+
+        storageStatus.value = getStorageStatus();
+    } catch (error) {
+        console.error('Error refreshing storage status:', error);
+        storageStatus.value = getStorageStatus();
+    }
 };
 
 const retryConnection = async () => {
@@ -118,8 +127,8 @@ const retryConnection = async () => {
     }
 };
 
-onMounted(() => {
-    refreshStatus();
+onMounted(async () => {
+    await refreshStatus();
 
     // Refresh status setiap 30 detik
     const interval = setInterval(refreshStatus, 30000);

@@ -110,6 +110,12 @@ const authStatus = ref({
 
 const checkAuthStatus = async () => {
     try {
+        // Import ensureGoogleSheetsInitialized function
+        const { ensureGoogleSheetsInitialized } = await import('@/services/storageService.js');
+
+        // Try to ensure Google Sheets is initialized first
+        await ensureGoogleSheetsInitialized();
+
         const isConnected = googleSheetsService.isConnected();
         const mode = googleSheetsService.getAuthMode ? googleSheetsService.getAuthMode() : 'Unknown';
         const spreadsheetId = googleSheetsService.getSpreadsheetId();
@@ -122,7 +128,9 @@ const checkAuthStatus = async () => {
             spreadsheetId,
             message: hasWriteAccess
                 ? 'You can perform all CRUD operations (Create, Read, Update, Delete) on Google Sheets.'
-                : 'Read-only access. Write operations will use localStorage fallback. Configure Service Account for full access.'
+                : isConnected
+                    ? 'Read-only access. Write operations will use localStorage fallback. Configure Service Account for full access.'
+                    : 'Google Sheets not connected. Check your configuration and network connection.'
         };
     } catch (error) {
         authStatus.value = {

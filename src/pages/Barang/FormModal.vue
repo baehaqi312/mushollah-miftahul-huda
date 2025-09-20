@@ -34,8 +34,8 @@
           </Button>
           <Button type="submit" :disabled="isSubmitting">
             <div v-if="isSubmitting" class="flex items-center gap-2">
-              <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-              <span>{{ isEditMode ? 'Menyimpan...' : 'Menambah...' }}</span>
+              <div class="animate-spin rounded-full h-4 w-4 border-b-2"></div>
+              <span>{{ isEditMode ? 'Loading...' : 'Loading...' }}</span>
             </div>
             <span v-else>Simpan</span>
           </Button>
@@ -128,13 +128,33 @@ const closeModal = () => {
   emit('update:open', false);
 };
 
-const handleSubmit = () => {
+const handleSubmit = async () => {
   // Debug: Log data yang akan dikirim
   console.log('FormModal - Data yang akan dikirim:', { ...form });
 
   // Mengirim data form ke parent component
   emit('submit', { ...form });
+
+  // Tunggu hingga proses loading selesai sebelum menutup modal
+  await waitForLoadingComplete();
   closeModal();
+};
+
+// Helper function untuk menunggu loading selesai
+const waitForLoadingComplete = () => {
+  return new Promise((resolve) => {
+    const checkLoading = () => {
+      const currentLoading = getLoadingState();
+      const isAnyLoading = props.isEditMode ? currentLoading.update : currentLoading.add;
+
+      if (!isAnyLoading) {
+        resolve();
+      } else {
+        setTimeout(checkLoading, 100); // Check setiap 100ms
+      }
+    };
+    checkLoading();
+  });
 };
 
 // Computed untuk loading state

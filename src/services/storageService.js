@@ -69,6 +69,12 @@ const initLocalStorage = () => {
 };
 
 const initGoogleSheets = async () => {
+    // Skip if already initialized and connected
+    if (googleSheetsInitialized && googleSheetsService.isConnected()) {
+        console.log('Google Sheets already initialized and connected');
+        return true;
+    }
+
     try {
         const validation = validateGoogleSheetsConfig();
         if (!validation.isValid) {
@@ -119,6 +125,15 @@ export const initStorage = async () => {
 };
 
 export const getUsers = async () => {
+    // Try to initialize Google Sheets if not already done
+    if (!googleSheetsInitialized) {
+        try {
+            await initGoogleSheets();
+        } catch (error) {
+            console.log('Google Sheets initialization failed, using localStorage fallback');
+        }
+    }
+
     if (googleSheetsInitialized) {
         try {
             const data = await googleSheetsService.getSheetAsJson(GOOGLE_SHEETS_CONFIG.SHEETS.USERS);
@@ -129,6 +144,8 @@ export const getUsers = async () => {
             }));
         } catch (error) {
             console.error('Error getting users from Google Sheets, falling back to localStorage:', error);
+            // Mark as not initialized if connection failed
+            googleSheetsInitialized = false;
         }
     }
 
@@ -138,6 +155,15 @@ export const getUsers = async () => {
 };
 
 export const saveUsers = async (users) => {
+    // Try to initialize Google Sheets if not already done
+    if (!googleSheetsInitialized) {
+        try {
+            await initGoogleSheets();
+        } catch (error) {
+            console.log('Google Sheets initialization failed, using localStorage fallback');
+        }
+    }
+
     if (googleSheetsInitialized) {
         try {
             const formattedUsers = users.map(user => ({
@@ -149,6 +175,8 @@ export const saveUsers = async (users) => {
             return;
         } catch (error) {
             console.error('Error saving users to Google Sheets, falling back to localStorage:', error);
+            // Mark as not initialized if connection failed
+            googleSheetsInitialized = false;
         }
     }
 
@@ -161,6 +189,15 @@ export const saveUsers = async (users) => {
 };
 
 export const getItems = async () => {
+    // Try to initialize Google Sheets if not already done
+    if (!googleSheetsInitialized) {
+        try {
+            await initGoogleSheets();
+        } catch (error) {
+            console.log('Google Sheets initialization failed, using localStorage fallback');
+        }
+    }
+
     if (googleSheetsInitialized) {
         try {
             const data = await googleSheetsService.getSheetAsJson(GOOGLE_SHEETS_CONFIG.SHEETS.ITEMS);
@@ -171,6 +208,8 @@ export const getItems = async () => {
             }));
         } catch (error) {
             console.error('Error getting items from Google Sheets, falling back to localStorage:', error);
+            // Mark as not initialized if connection failed
+            googleSheetsInitialized = false;
         }
     }
 
@@ -180,6 +219,15 @@ export const getItems = async () => {
 };
 
 export const saveItems = async (items) => {
+    // Try to initialize Google Sheets if not already done
+    if (!googleSheetsInitialized) {
+        try {
+            await initGoogleSheets();
+        } catch (error) {
+            console.log('Google Sheets initialization failed, using localStorage fallback');
+        }
+    }
+
     if (googleSheetsInitialized) {
         try {
             const formattedItems = items.map(item => ({
@@ -190,6 +238,8 @@ export const saveItems = async (items) => {
             return;
         } catch (error) {
             console.error('Error saving items to Google Sheets, falling back to localStorage:', error);
+            // Mark as not initialized if connection failed
+            googleSheetsInitialized = false;
         }
     }
 
@@ -223,6 +273,8 @@ export const getStorageStatus = () => ({
 
 export const retryGoogleSheets = async () => {
     try {
+        // Reset initialization flag to force re-init
+        googleSheetsInitialized = false;
         const success = await initGoogleSheets();
         console.log('Google Sheets connection retry:', success ? 'Success' : 'Failed');
         return success;
@@ -230,4 +282,16 @@ export const retryGoogleSheets = async () => {
         console.error('Failed to retry Google Sheets connection:', error);
         return false;
     }
+};
+
+// Helper function to ensure Google Sheets is initialized
+export const ensureGoogleSheetsInitialized = async () => {
+    if (!googleSheetsInitialized) {
+        try {
+            await initGoogleSheets();
+        } catch (error) {
+            console.error('Failed to initialize Google Sheets:', error);
+        }
+    }
+    return googleSheetsInitialized;
 };

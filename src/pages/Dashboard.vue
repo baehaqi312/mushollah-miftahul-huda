@@ -1,12 +1,6 @@
 <template>
   <AppLayout :breadcrumbs="breadcrumbs">
     <div class="p-4">
-      <!-- Google Sheets Authentication Status -->
-      <GoogleSheetsAuthStatus v-if="userRole === 'admin'" />
-
-      <!-- Google Sheets Status -->
-      <GoogleSheetsStatus v-if="userRole === 'admin'" />
-
       <!-- Loading State -->
       <div v-if="isLoading" class="mb-6 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg">
         <p class="text-gray-600 dark:text-gray-400">Memuat data...</p>
@@ -15,10 +9,16 @@
       <!-- Statistics Cards -->
       <div v-else class="mb-6">
         <h3 class="mb-4 text-lg font-semibold text-gray-700 dark:text-gray-200">
-          Statistik Barang ({{ items.length }} items)
+          Jumlah yang mengambil barang ({{ items.length }} Orang)
         </h3>
         <DashboardStats :items="items" />
       </div>
+      <!-- Google Sheets Authentication Status -->
+      <GoogleSheetsAuthStatus v-if="userRole === 'admin'" />
+
+      <!-- Google Sheets Status -->
+      <GoogleSheetsStatus v-if="userRole === 'admin'" />
+
     </div>
   </AppLayout>
 </template>
