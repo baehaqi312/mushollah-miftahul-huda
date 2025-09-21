@@ -104,9 +104,10 @@ const columns = [
             Button,
             {
                 variant: "ghost",
+                class: "w-full flex justify-center", // text-center for header
                 onClick: () => column.toggleSorting(column.getIsSorted() === "asc"),
             },
-            () => ["Jumlah", h(ArrowUpDown, { class: "ml-2 h-4 w-4" })]
+            () => [h("span", { class: "w-full text-center" }, "Jumlah"), h(ArrowUpDown, { class: "ml-2 h-4 w-4" })]
         ),
         cell: ({ row }) => h("div", { class: "text-center" }, row.getValue("jumlah")),
     },
@@ -149,7 +150,7 @@ const columns = [
     },
 ]
 
-const sorting = ref([])
+const sorting = ref([{ id: 'created_at', desc: true }]) // Default sort by newest first
 const columnFilters = ref([])
 const columnVisibility = ref({})
 const rowSelection = ref({})
@@ -201,18 +202,44 @@ const returnMessage = ref('')
 
 // Fungsi untuk membuka modal (mode tambah)
 const openCreateModal = () => {
-    isEditMode.value = false
-    // Reset form data
-    Object.assign(formData, { id: null, name: '', jumlah: '', status: 'Dipinjam' })
-    showFormModal.value = true
+    console.log('DataTable - Opening create modal');
+    isEditMode.value = false;
+
+    // Reset form data dengan nilai default yang jelas
+    const defaultData = {
+        id: null,
+        name: '',
+        jumlah: '',
+        status: 'Dipinjam',
+        created_at: null,
+        updated_at: null
+    };
+
+    Object.assign(formData, defaultData);
+    console.log('DataTable - FormData for create:', { ...formData });
+
+    showFormModal.value = true;
 }
 
 // Fungsi untuk membuka modal (mode edit)
 const openEditModal = (item) => {
-    isEditMode.value = true
-    // Isi form data dengan data item yang dipilih
-    Object.assign(formData, item)
-    showFormModal.value = true
+    console.log('DataTable - Opening edit modal for item:', item);
+    isEditMode.value = true;
+
+    // Pastikan semua data ter-copy dengan benar
+    const itemCopy = {
+        id: item.id,
+        name: item.name || '',
+        jumlah: item.jumlah || '',
+        status: item.status || 'Dipinjam',
+        created_at: item.created_at,
+        updated_at: item.updated_at
+    };
+
+    Object.assign(formData, itemCopy);
+    console.log('DataTable - FormData after assignment:', { ...formData });
+
+    showFormModal.value = true;
 }
 
 // Fungsi yang menangani event @submit dari modal
@@ -221,15 +248,26 @@ const handleFormSubmit = async (data) => {
     console.log('DataTable - Mode:', isEditMode.value ? 'Edit' : 'Add');
 
     try {
+        let result;
         if (isEditMode.value) {
-            await updateItem(data)
+            result = await updateItem(data);
+            console.log('DataTable - Update result:', result);
         } else {
-            await addItem(data)
+            result = await addItem(data);
+            console.log('DataTable - Add result:', result);
         }
-        // Beri tahu parent (Index.vue) untuk memuat ulang data
-        emit('refresh')
+
+        // Refresh data setelah operasi berhasil
+        emit('refresh');
+
+        // Log success
+        console.log('DataTable - Operation completed successfully');
+
+        return result;
     } catch (error) {
-        console.error('Error saving item:', error);
+        console.error('DataTable - Error saving item:', error);
+        // Re-throw error untuk ditangani di FormModal
+        throw error;
     }
 }
 

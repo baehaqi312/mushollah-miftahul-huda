@@ -86,6 +86,14 @@ const form = reactive({
   status: '', // Tambahkan status untuk menjaga data yang ada
 });
 
+// Method untuk reset form dengan benar
+const resetForm = () => {
+  form.id = null;
+  form.name = '';
+  form.jumlah = '';
+  form.status = 'Dipinjam';
+};
+
 // Loading state
 const loadingState = ref({
   add: false,
@@ -115,13 +123,25 @@ onUnmounted(() => {
 // Sinkronkan data dari parent (initialData) ke state lokal (form)
 // saat modal dibuka atau data awal berubah.
 watch(() => props.initialData, (newData) => {
-  if (newData) {
+  if (newData && props.open) {
+    console.log('FormModal - Receiving initialData:', newData);
     form.id = newData.id || null;
     form.name = newData.name || '';
     form.jumlah = newData.jumlah || '';
     form.status = newData.status || 'Dipinjam'; // Preserve status, default untuk add
+    console.log('FormModal - Form after update:', { ...form });
   }
 }, { deep: true, immediate: true });
+
+// Watch modal open/close
+watch(() => props.open, (isOpen) => {
+  if (!isOpen) {
+    // Reset form ketika modal ditutup dari luar
+    setTimeout(() => {
+      resetForm();
+    }, 300); // Delay untuk animasi modal
+  }
+});
 
 // --- METHODS ---
 const closeModal = () => {
@@ -132,13 +152,42 @@ const handleSubmit = async () => {
   // Debug: Log data yang akan dikirim
   console.log('FormModal - Data yang akan dikirim:', { ...form });
 
-  // Mengirim data form ke parent component
-  emit('submit', { ...form });
+  try {
+    // Validasi data sebelum submit
+    if (!form.name?.trim() || !form.jumlah) {
+      console.error('FormModal - Data tidak lengkap:', form);
+      alert('Nama dan jumlah tidak boleh kosong');
+      return;
+    }
 
-  // Tunggu hingga proses loading selesai sebelum menutup modal
-  await waitForLoadingComplete();
-  form.reset();
-  closeModal();
+    // Prepare clean data
+    const submitData = {
+      id: form.id,
+      name: form.name.trim(),
+      jumlah: form.jumlah.toString().trim(),
+      status: form.status || 'Dipinjam'
+    };
+
+    console.log('FormModal - Clean data to submit:', submitData);
+
+    // Mengirim data form ke parent component dan tunggu responsenya
+    const result = await emit('submit', submitData);
+
+    console.log('FormModal - Submit result:', result);
+
+    // Tunggu hingga proses loading selesai sebelum menutup modal
+    await waitForLoadingComplete();
+
+    console.log('FormModal - Loading completed, closing modal');
+
+    // Reset form setelah berhasil
+    resetForm();
+    closeModal();
+  } catch (error) {
+    console.error('FormModal - Error during submit:', error);
+    alert('Terjadi kesalahan saat menyimpan data: ' + error.message);
+    // Jangan tutup modal jika ada error
+  }
 };
 
 // Helper function untuk menunggu loading selesai

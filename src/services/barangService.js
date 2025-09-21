@@ -20,9 +20,37 @@ export const isLoadingOperation = (operation) => loading[operation] || false;
 export const fetchItems = async () => {
     loading.fetch = true;
     try {
-        return await getItems();
+        console.log('barangService - fetchItems called');
+        const items = await getItems();
+        console.log('barangService - fetchItems result:', items);
+        console.log('barangService - fetchItems count:', items ? items.length : 0);
+
+        // Ensure we return an array
+        if (!Array.isArray(items)) {
+            console.warn('barangService - getItems returned non-array, converting:', items);
+            return [];
+        }
+
+        // Sort items by created_at (newest first) and then by updated_at
+        const sortedItems = items.sort((a, b) => {
+            // Primary sort: by created_at (newest first)
+            const aCreated = new Date(a.created_at || 0);
+            const bCreated = new Date(b.created_at || 0);
+
+            if (aCreated.getTime() !== bCreated.getTime()) {
+                return bCreated.getTime() - aCreated.getTime();
+            }
+
+            // Secondary sort: by updated_at (newest first)
+            const aUpdated = new Date(a.updated_at || 0);
+            const bUpdated = new Date(b.updated_at || 0);
+            return bUpdated.getTime() - aUpdated.getTime();
+        });
+
+        console.log('barangService - items sorted by newest first');
+        return sortedItems;
     } catch (error) {
-        console.error('Error fetching items:', error);
+        console.error('barangService - Error fetching items:', error);
         return [];
     } finally {
         loading.fetch = false;
@@ -32,19 +60,33 @@ export const fetchItems = async () => {
 export const addItem = async (item) => {
     loading.add = true;
     try {
+        console.log('barangService - addItem called with:', item);
+
+        // Validasi data yang diperlukan
+        if (!item.name || !item.jumlah) {
+            throw new Error('Nama dan jumlah tidak boleh kosong');
+        }
+
         const items = await getItems();
+        console.log('barangService - existing items count:', items.length);
+
         const newItem = {
             ...item,
-            id: Date.now(), // ID unik sederhana
-            status: 'Dipinjam', // Default status saat menambah item baru
+            id: Date.now() + Math.random(), // ID unik yang lebih aman
+            status: item.status || 'Dipinjam', // Use provided status or default
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
         };
+
+        console.log('barangService - new item to be added:', newItem);
+
         items.push(newItem);
         await saveItems(items);
+
+        console.log('barangService - add completed successfully');
         return newItem;
     } catch (error) {
-        console.error('Error adding item:', error);
+        console.error('barangService - Error adding item:', error);
         throw error;
     } finally {
         loading.add = false;
@@ -55,20 +97,44 @@ export const updateItem = async (updatedItem) => {
     loading.update = true;
     try {
         console.log('barangService - updateItem called with:', updatedItem);
+
+        // Validasi data yang diperlukan
+        if (!updatedItem.id) {
+            throw new Error('ID item tidak boleh kosong untuk update');
+        }
+
+        if (!updatedItem.name || !updatedItem.jumlah) {
+            throw new Error('Nama dan jumlah tidak boleh kosong');
+        }
+
         let items = await getItems();
         console.log('barangService - items before update:', items);
 
+        // Cari item yang akan diupdate
+        const existingItemIndex = items.findIndex(item => item.id === updatedItem.id);
+        if (existingItemIndex === -1) {
+            throw new Error(`Item dengan ID ${updatedItem.id} tidak ditemukan`);
+        }
+
+        // Preserve data yang ada dan update yang perlu
+        const existingItem = items[existingItemIndex];
         const updatedItemWithTimestamp = {
-            ...updatedItem,
+            ...existingItem, // Preserve existing data
+            ...updatedItem,  // Override with new data
+            id: existingItem.id, // Ensure ID doesn't change
+            created_at: existingItem.created_at, // Preserve creation time
             updated_at: new Date().toISOString()
         };
 
-        items = items.map(item => (item.id === updatedItem.id ? updatedItemWithTimestamp : item));
+        items[existingItemIndex] = updatedItemWithTimestamp;
         console.log('barangService - items after update:', items);
+
         await saveItems(items);
+        console.log('barangService - update completed successfully');
+
         return updatedItemWithTimestamp;
     } catch (error) {
-        console.error('Error updating item:', error);
+        console.error('barangService - Error updating item:', error);
         throw error;
     } finally {
         loading.update = false;

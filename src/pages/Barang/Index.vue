@@ -45,10 +45,20 @@ onUnmounted(() => {
 const loadItems = async () => {
   isLoadingData.value = true;
   try {
+    console.log('Index - Loading items...');
     const fetchedItems = await fetchItems();
-    items.value = fetchedItems;
+    console.log('Index - Fetched items:', fetchedItems);
+
+    // Ensure we have valid data
+    if (Array.isArray(fetchedItems)) {
+      items.value = fetchedItems;
+      console.log('Index - Items loaded successfully, count:', fetchedItems.length);
+    } else {
+      console.error('Index - Invalid data format received:', fetchedItems);
+      items.value = [];
+    }
   } catch (error) {
-    console.error('Error loading items:', error);
+    console.error('Index - Error loading items:', error);
     items.value = [];
   } finally {
     isLoadingData.value = false;
