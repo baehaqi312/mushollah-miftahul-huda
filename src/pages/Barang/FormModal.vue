@@ -137,6 +137,7 @@ const handleSubmit = async () => {
 
   // Tunggu hingga proses loading selesai sebelum menutup modal
   await waitForLoadingComplete();
+  form.reset();
   closeModal();
 };
 
